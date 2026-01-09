@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Streamlit secrets (DO NOT PUSH)
+dashboard/.streamlit/secrets.toml
+
+# Virtual environments
+venv/
+.env/
+env/
+.venv/
+
+# Mac/Windows extra stuff
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# IDE configs (optional)
+.vscode/
+.idea/

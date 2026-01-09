@@ -5,7 +5,7 @@ __pycache__/
 *.pyd
 
 # Streamlit secrets (DO NOT PUSH)
-dashboard/.streamlit/secrets.toml
+.streamlit/secrets.toml
 
 # Virtual environments
 venv/

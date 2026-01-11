@@ -170,55 +170,93 @@ class DataService:
             return pd.DataFrame()
 
     def get_allocation_breakdown(self, sheet_name):
-        """
-        Calculates Need, Want, Investment percentages.
-        Source: 'Budget' sheet logic described in requirements.
-        """
-        # We need the values for specific categories from the 'Budget' sheet for this month
         try:
-            budget_df = self.get_sheet_as_df("Budget")
-            row = budget_df[budget_df['Month'] == sheet_name]
-            
-            if row.empty: 
+            ct_df = self.get_sheet_as_df("category total")
+            if sheet_name not in ct_df.columns:
                 return pd.DataFrame()
-            
-            vals = row.iloc[0].fillna(0) # Get row as Series
-            
-            # Logic from Requirements
-            # Investment
-            inv = vals.get('Investment', 0)
-            
-            # Need (Rent + Grocery + Travel + Petrol + Gas & Water + Medicine + EB & EC + Emergency Fund + (Others / 2))
-            # Note: Map exact column names. 
-            # Check for 'Travel ' (trailing space) based on earlier analysis?
-            # Analyzing 'Budget' columns from earlier: ['Travel ', 'Entertainment', ...]
-            
-            need = (
-                vals.get('Rent', 0) + 
-                vals.get('Grocery', 0) + 
-                vals.get('Travel ', 0) + # Note the space if persistent
-                vals.get('Petrol', 0) + 
-                vals.get('Gas & Water', 0) + 
-                vals.get('Medicine', 0) + 
-                vals.get('EB & EC', 0) + 
-                vals.get('Emergency Fund', 0) + 
-                (vals.get('Others', 0) / 2)
-            )
-            
-            # Want (Entertainment + (Others / 2))
-            want = (
-                vals.get('Entertainment', 0) + 
-                (vals.get('Others', 0) / 2)
-            )
-            
+
+            ct_df['Category'] = ct_df['Category'].astype(str).str.strip().str.lower()
+            month_col = sheet_name
+
+            def get_val(cat):
+                cat = cat.lower().strip()
+                row = ct_df[ct_df['Category'] == cat]
+                if row.empty:
+                    return 0
+                val = row.iloc[0][month_col]
+                if val is None or val in ["", " ", "-", "N/A"]:
+                    return 0
+                if isinstance(val, str):
+                    val = val.replace(",", "").strip()
+                try:
+                    return float(val)
+                except:
+                    return 0
+
+            NEED_CATS = [
+                "rent", "grocery", "petrol", "gas & water", "medicine",
+                "eb & ec", "emergency fund", "car maintenance", "bike maintenance",
+                "relatives", "last month debt", "home app/maintenance", "emi"
+            ]
+
+            WANT_CATS = [
+                "entertainment", "grooming", "trip/vacation",
+                "gifts", "self improvement", "withdrawal"
+            ]
+
+            INVEST_CAT = "investment"
+            OTHERS_CAT = "others"
+
+            # Raw spend
+            need_sum = sum(get_val(c) for c in NEED_CATS)
+            want_sum = sum(get_val(c) for c in WANT_CATS)
+            invest_sum = get_val(INVEST_CAT)
+
+            # Split Others 50/50
+            others_val = get_val(OTHERS_CAT)
+            need_sum += others_val * 0.5
+            want_sum += others_val * 0.5
+
+            # Total spend
+            spend_total = need_sum + want_sum
+
+            # Income
+            income = get_val("income")
+
+            # Avoid zero edge case
+            if income <= 0 and spend_total <= 0 and invest_sum <= 0:
+                return pd.DataFrame()
+
+            # Option 4 math model:
+            # Investment = % of income
+            invest_pct = (invest_sum / income * 100) if income > 0 else 0
+
+            # Need/Want = % of spend (overspend friendly)
+            if spend_total > 0:
+                need_pct = (need_sum / spend_total * 100)
+                want_pct = (want_sum / spend_total * 100)
+            else:
+                need_pct = want_pct = 0
+
+            # Normalize to 100% donut
+            total = need_pct + want_pct + invest_pct
+            if total == 0:
+                return pd.DataFrame()
+
+            #need_pct = need_pct / total * 100
+            #want_pct = want_pct / total * 100
+            #invest_pct = invest_pct / total * 100
+
             return pd.DataFrame({
                 "Type": ["Need", "Want", "Investment"],
-                "Amount": [need, want, inv]
+                "Raw": [need_sum, want_sum, invest_sum],
+                "Percent": [need_pct, want_pct, invest_pct]
             })
-            
+
         except Exception as e:
-            st.error(f"Allocation Error: {e}")
+            st.error(f"Allocation Breakdown Error: {e}")
             return pd.DataFrame()
+
 
     def get_budget_vs_actual(self, sheet_name):
         """

@@ -96,27 +96,55 @@ try:
             st.plotly_chart(fig_bar, use_container_width=True)
         else:
             st.info("No category data available.")
-            
+
     with c2:
         st.subheader("Allocation")
         alloc_df = data_service.get_allocation_breakdown(current_sheet_name)
         if not alloc_df.empty:
-            fig_pie = px.pie(
-                alloc_df, 
-                values="Amount", 
-                names="Type", 
-                hole=0.4,
-                color="Type",
-                color_discrete_map={
-                    "Need": "#EF4444",   # Red
-                    "Want": "#F59E0B",   # Amber
-                    "Investment": "#10B981" # Green
-                }
+            alloc_df = (
+                alloc_df.set_index("Type")
+                        .loc[["Need","Want","Investment"]]
+                        .reset_index()
             )
-            fig_pie.update_traces(textinfo='percent+label')
-            st.plotly_chart(fig_pie, use_container_width=True)
+
+            import plotly.graph_objects as go
+
+            fig = go.Figure()
+
+            colors = {
+                "Need": "#EF4444",
+                "Want": "#F59E0B",
+                "Investment": "#10B981"
+            }
+
+            for i, row in alloc_df.iterrows():
+                fig.add_trace(
+                    go.Bar(
+                        y=[row["Type"]],
+                        x=[row["Percent"]],
+                        name=row["Type"],
+                        orientation="h",
+                        marker=dict(color=colors[row["Type"]]),
+                        customdata=[row["Raw"]],
+                        hovertemplate="<b>%{y}</b><br>₹%{customdata:,.0f}<br>%{x:.1f}%",
+                        showlegend=False
+                    )
+                )
+
+            fig.update_layout(
+                xaxis=dict(range=[0,100], ticksuffix="%"),
+                yaxis=dict(type='category'),
+                height=200,
+                margin=dict(l=40,r=20,t=20,b=20),
+                barmode='group'
+            )
+
+            st.plotly_chart(fig, use_container_width=True)
+
         else:
-            st.info("No allocation data.")
+            st.info("No allocation data available for this month.")
+
+
 
     # --- New Feature: Budget vs Actual ---
     st.subheader("Budget vs Actual by Category")

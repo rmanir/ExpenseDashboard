@@ -42,6 +42,12 @@ with st.sidebar:
         if not data_service.use_gsheets:
             st.warning("Running in Offline Mode")
 
+        st.divider()
+        if st.button("🔄 Refresh Sheets"):
+            st.cache_resource.clear()
+            st.rerun()
+
+
     except Exception as e:
         st.error(f"Error loading metadata: {e}")
         st.stop()
